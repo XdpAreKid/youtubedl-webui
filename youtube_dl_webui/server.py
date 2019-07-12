@@ -5,13 +5,35 @@ import json
 
 from flask import Flask
 from flask import render_template
+from flask_apscheduler import APScheduler
 from flask import request
 from multiprocessing import Process
+import time
+from .update_ytdl import Check_Version
 from copy import deepcopy
 
 MSG = None
 
+#Time task
+class UpgradeConfig(object):
+    JOBS = [
+        {
+            'id': 'upgradeYTDL',
+            'func': 'update_ytdl:print_test',
+            'trigger': 'interval',
+            'seconds': 5,
+        }
+    ]
+    SCHEDULER_API_ENABLED = True
+
+
+
 app = Flask(__name__)
+app.config.from_object(UpgradeConfig())
+scheduler = APScheduler()
+scheduler.init_app(app)
+
+
 
 MSG_INVALID_REQUEST = {'status': 'error', 'errmsg': 'invalid request'}
 
@@ -55,6 +77,7 @@ def task_batch(action):
 
     MSG.put('batch', payload)
     return json.dumps(MSG.get())
+
 
 @app.route('/task/tid/<tid>', methods=['DELETE'])
 def delete_task(tid):
@@ -112,6 +135,7 @@ def get_config():
     return json.dumps(MSG.get())
 
 
+
 ###
 # test cases
 ###
@@ -132,6 +156,10 @@ class Server(Process):
     def run(self):
         global MSG
         MSG = self.msg_cli
+        app.config.from_object(UpgradeConfig())
+        scheduler = APScheduler()
+        scheduler.init_app(app)
+        scheduler.start()
         app.run(host=self.host, port=int(self.port), use_reloader=False)
 
 
